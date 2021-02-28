@@ -41,6 +41,7 @@ const startApp = () => {
                 addEmp();
                 break;
             case 'Remove employee':
+                removeEmp();
                 break;
             case 'Update employee role':
                 break;
@@ -182,6 +183,56 @@ const addEmp = () => {
         })
 }
 
+const removeEmp = () => {
+    connection.query(allEmployeeQuery, (err, results) => {
+        if (err) throw err;
+        console.log(' ');
+        console.table(chalk.yellow('All employees'), results)
+        inquirer.prompt([
+            {
+                name: 'removeID',
+                type: 'input',
+                message: 'Enter the ID of the employee you would like to remove:'
+            }
+        ]).then((answer) => {
+            connection.query(`DELETE FROM employees where ?`, { id: answer.removeID })
+            startApp();
+        })
+    })
+}
 
+const updateEmpRole = () => {
+    const query = `SELECT CONCAT (first_name, " ", last_name) AS full_name FROM employees; SELECT title FROM roles`
+    connection.query(query, (err, results) => {
+        if (err) throw err;
+
+        inquirer.prompt([
+            {
+                name: 'roleEmp',
+                type: 'list',
+                choices: function() {
+                    let choiceArray = results[0].map(choice => choice.full_name);
+                    return choiceArray;
+                },
+                message: "Select the employee who's role you would like to update:"
+            },
+            {
+                name: 'updatedRole',
+                type: 'list',
+                choices: function() {
+                    let choiceArray = results[1].map(choice => choice.title);
+                    return choiceArray;
+                }
+            }
+        ]).then((answer) => {
+            connection.query(`UPDATE employees
+            SET role_id = (SELECT id FROM roles WHERE title = ? )
+            WHERE id = (SELECT id FROM(SELECT id FROM employees WHERE CONCAT(first_name," ",last_name) = ?) AS tmptable)`, [answer.updatedRole, answer.roleEmp], (err, results) => {
+                if (err) throw err;
+                startApp();
+            })
+        })
+    })
+}
 
 startApp();
