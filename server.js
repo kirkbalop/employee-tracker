@@ -5,6 +5,7 @@ const cTable = require('console.table');
 // including Chalk package for increased legibility
 const chalk = require('chalk');
 const connection = require('./config/connection');
+const { start } = require('repl');
 
 
 // Arrays for inquirer menu selections
@@ -19,7 +20,15 @@ ON d.id = r.department_id
 LEFT JOIN employees m ON m.id = e.manager_id
 ORDER BY e.id;`
 const addEmployeeQuestions = ['What is the first name?', 'What is the last name?', 'What is their role?', 'Who is their manager?']
-
+const roleQuery = `SELECT * FROM roles; SELECT CONCAT (e.first_name," ",e.last_name) AS full_name FROM employees e`
+const mgrQuery = `SELECT CONCAT (e.first_name," ", e.last_name) AS full_name, r.title, d.department_name AS "Department", IFNULL(r.salary, 'No data') AS "Salary", CONCAT(m.first_name," ",m.last_name) AS "Manager"
+FROM employees e
+LEFT JOIN roles r
+ON r.id = e.role_id
+LEFT JOIN departments d
+ON d.id = r.department_id
+LEFT JOIN employees m ON m.id = e.manager_id
+ORDER BY e.id;`
 const startApp = () => {
     inquirer.prompt({
             name: 'menuChoice',
@@ -44,18 +53,25 @@ const startApp = () => {
                 removeEmp();
                 break;
             case 'Update employee role':
+                updateEmpRole();
                 break;
             case 'View all roles':
+                viewRoles();
                 break;
             case 'Add role':
+                addRole();
                 break;
             case 'Remove role':
+                removeRole();
                 break;
             case 'View all departments':
+                viewDept();
                 break;
             case 'Add department':
+                addDept();
                 break;
             case 'Remove department':
+                removeDept();
                 break;
             case 'Exit':
                 connection.end();
@@ -231,6 +247,133 @@ const updateEmpRole = () => {
                 if (err) throw err;
                 startApp();
             })
+        })
+    })
+}
+
+const viewRoles = () => {
+    let query = `Select title AS "Title" FROM roles`;
+    connection.query(query, (err, results) => {
+        if (err) throw err;
+
+        console.log(' ');
+        console.table(chalk.yellow('All roles'), results);
+        startApp();
+    })
+}
+
+const addRole = () => {
+    const addRoleQuery = `SELECT * FROM roles; SELECT * FROM departments`
+    connection.query(addRoleQuery, (err, results) => {
+        if (err) throw err;
+
+        console.log(' ');
+        console.table(chalk.yellow('List of current roles:'), results[0]);
+
+        inquirer.prompt([
+            {
+                name: 'newRole',
+                type: 'input',
+                message: 'Enter the new title:'
+            },
+            {
+                name: 'newSalary',
+                type: 'input',
+                message: 'Enter the salary for the new role:'
+            },
+            {
+                name: 'dept',
+                type: 'list',
+                choices: function() {
+                    let choiceArray = results[1].map(choice => choice.department_name);
+                    return choiceArray;
+                },
+                message: 'Select the department associated with the new title:'
+            }
+        ]).then((answer) => {
+            connection.query(
+                `INSERT INTO roles(title, salary, department_id)
+                VALUES
+                
+                ("${answer.newRole}", "${answer.newSalary}",
+                (SELECT id FROM departments WHERE department_name = "${answer.dept}"));`
+            )
+            startApp();
+        })
+    })
+}
+
+removeRole = () => {
+    query = `SELECT * FROM roles`;
+    connection.query(query, (err, results) => {
+        if (err) throw err;
+
+        inquirer.prompt([
+            {
+                name: 'removeRole',
+                type: 'list',
+                choices: function() {
+                    let choiceArray = results.map(choice => choices.title);
+                    return choiceArray;
+                },
+                message: 'Select a role to remove:'
+            }
+        ]).then((answer) => {
+            connection.query(`DELETE FROM roles WHERE ? `, { title: answer.removeRole });
+        })
+    })
+}
+
+const viewDept = () => {
+    query = `SELECT department_name AS "Departments" FROM departmnets`;
+    connection.query(query, (err, results) => {
+        if (err) throw err;
+
+        console.log(' ');
+        console.table(chalk.yellow('All departments'), results)
+        startApp();
+    })
+}
+
+const addDept = () => {
+    query = `SELECT department_name AS "Departments" FROM departments`;
+    connection.query(query, (err, results) => {
+        if (err) throw err;
+
+        console.log(' ');
+        console.table(chalk.yellow('List of current departments'), results);
+
+        inquirer.prompt([
+            {
+                name: 'newDept',
+                type: 'input',
+                message: 'Enter the name of the department to be added:'
+            }
+        ]).then((answer) => {
+            connection.query(`INSERT INTO departments(department_name) VALUES ( ? )`, answer.newDept)
+            startApp();
+        })
+    })
+}
+
+const removeDept = () => {
+    query = `SELECT * FROM departments`;
+    connection.query(query, (err, results) => {
+        if (err) throw err;
+
+        inquirer.prompt([
+            {
+                name: 'dept',
+                type: 'list',
+                choices: function() {
+                    let choiceArray = results.map(choice => choice.department_name);
+                    return choiceArray;
+                },
+                message: 'Select the department to remove:'
+            }
+        ]).then((answer) => {
+            connection.query(`DELETE FROM departments WHERE ? `, { department_name: answer.dept })
+            startApp();
         })
     })
 }
